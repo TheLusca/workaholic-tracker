@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caderno de Horas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1E1B18;
+    --panel: #26221E;
+    --panel-2: #2E2924;
+    --ink: #EDE6D6;
+    --muted: #8C8378;
+    --brass: #D6923F;
+    --brass-bright: #F2B565;
+    --teal: #5C7D71;
+    --rust: #B5533C;
+    --border: #3A342C;
+    --lvl0: #2A2620;
+    --lvl1: #4A3B24;
+    --lvl2: #7A5A2C;
+    --lvl3: #B98536;
+    --lvl4: #F2B565;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    padding: 28px 20px 60px;
+    display: flex;
+    justify-content: center;
+  }
+  #app {
+    width: 100%;
+    max-width: 880px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  ::selection { background: var(--brass); color: var(--bg); }
+  :focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace; }
+
+  /* ---------- header ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { width: 26px; height: 26px; }
+  .brand h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+  .save-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border);
+    display: inline-block;
+    margin-left: 8px;
+    transition: background .2s, box-shadow .2s;
+  }
+  .save-dot.flash {
+    background: var(--brass-bright);
+    box-shadow: 0 0 8px var(--brass-bright);
+  }
+
+  .btn-ghost, .btn-primary {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: transform .1s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+  }
+  .btn-ghost:hover { border-color: var(--brass); color: var(--brass-bright); }
+  .btn-primary {
+    background: var(--brass);
+    color: #211D18;
+    border-color: var(--brass);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--brass-bright); }
+  .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+  .btn-primary:disabled, .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .bank-controls { display: flex; align-items: center; gap: 8px; position: relative; flex-wrap: wrap; row-gap: 8px; }
+
+  .popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    width: 270px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 20;
+  }
+  .popover.open { display: flex; }
+  .popover label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .popover input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 14px;
+  }
+  .np-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .popover-divider { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+  .projects-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+  .projects-empty { color: var(--muted); font-size: 12px; padding: 2px; }
+  .project-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .project-row-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-edit-btn, .project-del-btn {
+    background: none; border: none; color: var(--muted);
+    font-family: inherit; font-size: 11px; cursor: pointer;
+    padding: 3px 5px; border-radius: 4px;
+  }
+  .project-edit-btn:hover { color: var(--brass-bright); }
+  .project-del-btn:hover { color: var(--rust); }
+  .project-row.editing { flex-wrap: wrap; gap: 6px; padding: 6px 0; }
+  .project-edit-name {
+    flex: 1 1 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 8px; color: var(--ink);
+    font-family: inherit; font-size: 13px;
+  }
+  .color-swatches { display: flex; gap: 5px; flex: 1 1 auto; align-items: center; }
+  .color-swatch {
+    width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .color-swatch.selected { border-color: var(--ink); }
+  .project-row-actions { display: flex; gap: 6px; margin-left: auto; }
+  .project-row-actions button { padding: 5px 10px; font-size: 12px; }
+
+  /* ---------- panels ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  body.loaded .panel { opacity: 1; transform: translateY(0); }
+  body.loaded .panel:nth-of-type(1) { transition-delay: .02s; }
+  body.loaded .panel:nth-of-type(2) { transition-delay: .08s; }
+  body.loaded .panel:nth-of-type(3) { transition-delay: .14s; }
+  body.loaded .panel:nth-of-type(4) { transition-delay: .20s; }
+
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin: 0;
+    font-weight: 600;
+  }
+
+  /* ---------- workspace / locked state ---------- */
+  .workspace { display: flex; flex-direction: column; gap: 16px; }
+  .workspace.hidden { display: none; }
+  #locked-panel.hidden { display: none; }
+  .locked-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+  /* ---------- timer ---------- */
+  .timer-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .timer-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-controls { display: flex; align-items: center; gap: 10px; }
+  select {
+    background: var(--panel-2);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    max-width: 180px;
+  }
+  select:disabled { opacity: 0.5; }
+  #timer-toggle { min-width: 110px; }
+  #timer-toggle.running {
+    background: var(--rust);
+    border-color: var(--rust);
+    color: #F3E5E0;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(181,83,60,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(181,83,60,0); }
+  }
+
+  /* ---------- manual form ---------- */
+  .manual-form {
+    display: grid;
+    grid-template-columns: 130px 1fr 60px 60px 1.4fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .manual-form input[type=date],
+  .manual-form input[type=number],
+  .manual-form input[type=text] {
+    background: var(--panel-2);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    width: 100%;
+  }
+  .manual-form input::placeholder { color: var(--muted); }
+
+  /* ---------- panel header / view switch / nav ---------- */
+  .heatmap-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .view-switch { display: flex; gap: 3px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+  .view-switch button {
+    background: transparent; border: none; color: var(--muted);
+    font-family: inherit; font-size: 12px; padding: 6px 11px;
+    border-radius: 6px; cursor: pointer; transition: background .15s, color .15s;
+  }
+  .view-switch button.active { background: var(--brass); color: #211D18; font-weight: 600; }
+  .view-switch button:not(.active):hover { color: var(--ink); }
+
+  .panel-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .nav-arrow { padding: 5px 11px; font-size: 12px; line-height: 1; }
+  .nav-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-label { font-size: 13px; color: var(--ink); min-width: 90px; }
+  #heatmap-filter { margin-left: auto; }
+  .view-content.hidden, .hidden { display: none; }
+  .mode-content { padding-top: 2px; }
+  .tab-live-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--rust); margin-left: 6px; vertical-align: middle;
+    animation: pulse-dot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ---------- day view ---------- */
+  .day-view { display: flex; flex-direction: column; gap: 10px; }
+  .day-row { display: flex; align-items: center; gap: 10px; }
+  .day-row-label { display: flex; align-items: center; gap: 8px; min-width: 140px; font-size: 13px; }
+  .day-row-bar-track { flex: 1; background: var(--panel-2); border-radius: 4px; height: 14px; overflow: hidden; }
+  .day-row-bar { height: 100%; border-radius: 4px; transition: width .3s ease; }
+  .day-row-value { min-width: 54px; text-align: right; color: var(--brass-bright); font-size: 13px; }
+  .day-total {
+    margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; font-size: 13px; color: var(--muted);
+  }
+  .day-total strong { color: var(--brass-bright); font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+
+  /* ---------- week view ---------- */
+  .week-chart { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding-top: 20px; }
+  .week-col { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; height: 100%; justify-content: flex-end; }
+  .week-total { font-size: 10px; color: var(--muted); min-height: 12px; }
+  .week-bar-track { width: 100%; max-width: 34px; display: flex; flex-direction: column-reverse; border-radius: 3px; overflow: hidden; background: var(--panel-2); min-height: 2px; }
+  .week-seg { width: 100%; }
+  .week-day-label { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.35; }
+  .week-day-label.today { color: var(--brass-bright); font-weight: 600; }
+  .week-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .week-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+  /* ---------- month calendar ---------- */
+  .month-cal-labels {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 6px;
+  }
+  .month-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 36px; gap: 4px; }
+  .month-cal-cell { border-radius: 4px; background: var(--lvl0); position: relative; }
+  .month-cal-cell.lvl0 { background: var(--lvl0); }
+  .month-cal-cell.lvl1 { background: var(--lvl1); }
+  .month-cal-cell.lvl2 { background: var(--lvl2); }
+  .month-cal-cell.lvl3 { background: var(--lvl3); }
+  .month-cal-cell.lvl4 { background: var(--lvl4); box-shadow: 0 0 4px rgba(242,181,101,0.5); }
+  .month-cal-cell.out-of-month { opacity: 0.3; }
+  .month-cal-cell.today { outline: 1.5px solid var(--brass-bright); outline-offset: -1.5px; }
+  .month-cal-daynum { position: absolute; top: 3px; left: 5px; font-size: 9px; color: var(--muted); }
+  .month-cal-cell.lvl2 .month-cal-daynum,
+  .month-cal-cell.lvl3 .month-cal-daynum,
+  .month-cal-cell.lvl4 .month-cal-daynum { color: rgba(33,29,24,0.7); }
+
+  /* ---------- heatmap (semester / year) ---------- */
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .heatmap-body { display: flex; gap: 8px; width: max-content; }
+  .day-labels {
+    display: grid;
+    grid-template-rows: 14px repeat(7, 12px);
+    row-gap: 3px;
+    font-size: 9px;
+    color: var(--muted);
+    text-align: right;
+    padding-right: 2px;
+  }
+  .month-row { display: grid; gap: 3px; height: 14px; margin-bottom: 3px; }
+  .month-row span { font-size: 9px; color: var(--muted); white-space: nowrap; }
+  .day-grid { display: grid; gap: 3px; }
+  .cell { width: 12px; height: 12px; border-radius: 2px; background: var(--lvl0); }
+  .cell.lvl0 { background: var(--lvl0); }
+  .cell.lvl1 { background: var(--lvl1); }
+  .cell.lvl2 { background: var(--lvl2); }
+  .cell.lvl3 { background: var(--lvl3); }
+  .cell.lvl4 { background: var(--lvl4); box-shadow: 0 0 4px rgba(242,181,101,0.5); }
+  .heatmap-legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); margin-top: 10px; }
+  .heatmap-legend .cell { width: 10px; height: 10px; }
+
+  #tooltip {
+    position: fixed;
+    background: #0F0D0B;
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 50;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  #tooltip.hidden { display: none; }
+
+  /* ---------- stats ---------- */
+  .stats-strip { display: flex; gap: 12px; }
+  .stat {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; color: var(--brass-bright); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+  /* ---------- entries ---------- */
+  #entries-list { display: flex; flex-direction: column; gap: 6px; }
+  .entry-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 13px;
+  }
+  .entry-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .entry-date { font-family: 'JetBrains Mono', monospace; color: var(--muted); min-width: 40px; }
+  .entry-project { font-weight: 500; min-width: 90px; }
+  .entry-duration { font-family: 'JetBrains Mono', monospace; color: var(--brass-bright); min-width: 50px; }
+  .entry-note { color: var(--muted); flex: 1; min-width: 80px; }
+  .entry-source { color: var(--muted); }
+  .entry-edit, .entry-del {
+    background: none; border: none; color: var(--muted);
+    font-family: inherit; font-size: 12px; cursor: pointer;
+    padding: 4px 6px; border-radius: 4px;
+  }
+  .entry-edit:hover { color: var(--brass-bright); }
+  .entry-del:hover { color: var(--rust); }
+  .empty { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .manual-form { grid-template-columns: 1fr 1fr; }
+    .manual-form input[type=text] { grid-column: 1 / -1; }
+    .manual-form button { grid-column: 1 / -1; }
+    .timer-display { font-size: 32px; }
+    .stats-strip { flex-direction: column; }
+    #heatmap-filter { margin-left: 0; width: 100%; }
+    .panel-nav { flex-wrap: wrap; }
+    .week-chart { height: 140px; }
+    .month-cal-grid { grid-auto-rows: 28px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="9" stroke="#D6923F" stroke-width="1.6"/>
+        <line x1="12" y1="12" x2="12" y2="6.5" stroke="#F2B565" stroke-width="1.6" stroke-linecap="round"/>
+        <line x1="12" y1="12" x2="16" y2="14" stroke="#F2B565" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="1.3" fill="#F2B565"/>
+      </svg>
+      <h1>Caderno de Horas<span id="save-indicator" class="save-dot" title="salvo no banco de horas"></span></h1>
+    </div>
+    <div class="bank-controls">
+      <button id="btn-bank-open" class="btn-ghost" type="button" title="abrir um banco de horas (.json) já existente">carregar banco de horas</button>
+      <button id="btn-bank-new" class="btn-ghost" type="button" title="criar um novo banco de horas (.json)">+ novo banco</button>
+      <button id="btn-projects" class="btn-ghost" type="button" disabled>projetos</button>
+      <div class="popover" id="projects-popover">
+        <div id="projects-list" class="projects-list"></div>
+        <hr class="popover-divider">
+        <label for="np-name">novo projeto</label>
+        <input type="text" id="np-name" placeholder="ex: site da padaria" maxlength="40">
+        <div class="np-actions">
+          <button id="np-cancel" class="btn-ghost" type="button">fechar</button>
+          <button id="np-save" class="btn-primary" type="button">criar</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="panel" id="locked-panel">
+    <h2 style="margin-bottom:10px;">nenhum banco de horas carregado</h2>
+    <p class="empty">crie um banco novo ou carregue um arquivo <span class="mono">.json</span> existente para começar a registrar horas. enquanto isso, nenhum registro é feito.</p>
+    <div class="locked-actions">
+      <button id="btn-bank-new-main" class="btn-primary" type="button">+ novo banco de horas</button>
+      <button id="btn-bank-open-main" class="btn-ghost" type="button">carregar banco de horas</button>
+    </div>
+  </section>
+
+  <div id="workspace" class="workspace hidden">
+
+    <section class="panel">
+      <div class="heatmap-header" style="margin-bottom:18px;">
+        <h2>registrar horas</h2>
+        <div class="view-switch" id="register-switch">
+          <button data-mode="timer" type="button">⏱ timer<span class="tab-live-dot" id="timer-live-dot" style="display:none;"></span></button>
+          <button data-mode="manual" type="button">✎ entrada</button>
+        </div>
+      </div>
+
+      <div id="mode-timer" class="mode-content timer-panel">
+        <div class="timer-display mono" id="timer-display">00:00:00</div>
+        <div class="timer-controls">
+          <select id="timer-project-select"></select>
+          <button id="timer-toggle" class="btn-primary" type="button">► iniciar</button>
+        </div>
+      </div>
+
+      <div id="mode-manual" class="mode-content hidden">
+        <form id="manual-form" class="manual-form">
+          <input type="date" id="m-date" required>
+          <select id="m-project" required></select>
+          <input type="number" id="m-hours" min="0" step="1" placeholder="h">
+          <input type="number" id="m-minutes" min="0" max="59" step="1" placeholder="min">
+          <input type="text" id="m-note" placeholder="nota (opcional)">
+          <button type="submit" id="manual-submit-btn" class="btn-primary">salvar</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="heatmap-header">
+        <h2>painel</h2>
+        <div class="view-switch" id="view-switch">
+          <button data-view="day" type="button">dia</button>
+          <button data-view="week" type="button">semana</button>
+          <button data-view="month" type="button">mês</button>
+          <button data-view="semester" type="button">6 meses</button>
+          <button data-view="year" type="button">ano</button>
+        </div>
+      </div>
+
+      <div class="panel-nav" id="panel-nav">
+        <button id="nav-prev" class="btn-ghost nav-arrow" type="button">◀</button>
+        <span id="nav-label" class="nav-label mono"></span>
+        <button id="nav-next" class="btn-ghost nav-arrow" type="button">▶</button>
+        <select id="heatmap-filter"></select>
+      </div>
+
+      <div id="view-day" class="view-content"></div>
+
+      <div id="view-week" class="view-content"></div>
+
+      <div id="view-month" class="view-content">
+        <div class="month-cal-labels">
+          <span>seg</span><span>ter</span><span>qua</span><span>qui</span><span>sex</span><span>sáb</span><span>dom</span>
+        </div>
+        <div class="month-cal-grid" id="month-cal-grid"></div>
+        <div class="day-total"><span>total do mês</span><strong class="mono" id="month-cal-total"></strong></div>
+      </div>
+
+      <div id="view-heatmap" class="view-content">
+        <div class="heatmap-scroll">
+          <div class="heatmap-body" id="heatmap-body">
+            <div class="day-labels">
+              <span></span><span>seg</span><span></span><span>qua</span><span></span><span>sex</span><span></span>
+            </div>
+            <div class="grid-wrap">
+              <div class="month-row" id="month-row"></div>
+              <div class="day-grid" id="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
+        <div class="heatmap-legend">
+          menos <span class="cell lvl0"></span><span class="cell lvl1"></span><span class="cell lvl2"></span><span class="cell lvl3"></span><span class="cell lvl4"></span> mais
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-strip" id="stats-strip"></section>
+
+    <section class="panel">
+      <div class="heatmap-header" style="margin-bottom:14px;">
+        <h2>registros recentes</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btn-import-csv" class="btn-ghost" type="button">importar CSV ↑</button>
+          <button id="btn-export-csv" class="btn-ghost" type="button">exportar planilha (CSV) ↓</button>
+        </div>
+      </div>
+      <input type="file" id="csv-import-input" accept=".csv,text/csv" style="display:none">
+      <div id="entries-list"></div>
+    </section>
+
+  </div>
+
+</div>
+<div id="tooltip" class="hidden"></div>
+
+<script>
+  const MONTHS_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const MONTHS_FULL_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const WEEKDAYS_PT = ['seg','ter','qua','qui','sex','sáb','dom'];
+  const PALETTE = ['#D6923F', '#5C7D71', '#B5533C', '#7A8CAE', '#8C7A9E', '#A3A15C'];
+
+  let state = { projects: [], entries: [] };
+  let activeTimer = null;
+  let tickInterval = null;
+  let heatmapFilter = 'all';
+  let editingEntryId = null;
+  let editingProjectId = null;
+  let editingProjectName = null;
+  let editingProjectColor = null;
+  let panelView = 'day';
+  let registerMode = 'timer';
+  let dayCursor = new Date(); dayCursor.setHours(0,0,0,0);
+  let weekCursor = new Date(); weekCursor.setHours(0,0,0,0);
+  let monthCursor = new Date(); monthCursor.setHours(0,0,0,0);
+
+  // ---------- helpers ----------
+  function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function fmtDate(d){
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  function formatDatePt(dateStr){ const [y,m,d] = dateStr.split('-'); return `${d}/${m}`; }
+  function formatDatePtFull(dateStr){ const [y,m,d] = dateStr.split('-'); return `${d}/${m}/${y}`; }
+  function formatDuration(mins){
+    const h = Math.floor(mins/60), m = mins % 60;
+    if (h===0) return `${m}min`;
+    if (m===0) return `${h}h`;
+    return `${h}h${String(m).padStart(2,'0')}`;
+  }
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function getWeekStart(d){
+    const dow = d.getDay();
+    const diff = dow===0 ? -6 : 1-dow;
+    const monday = new Date(d); monday.setDate(d.getDate()+diff); monday.setHours(0,0,0,0);
+    return monday;
+  }
+  function getMonthStart(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function getMonthEnd(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+
+  // ---------- persistence: banco de horas (arquivo .json local via File System Access API) ----------
+  let fileHandle = null;
+  let pendingHandle = null; // handle achado no IndexedDB mas cuja permissão expirou (precisa de clique pra renovar)
+  const FS_SUPPORTED = 'showSaveFilePicker' in window && 'showOpenFilePicker' in window;
+  const IDB_NAME = 'workaholic-tracker-fs';
+  const IDB_STORE = 'handles';
+  const IDB_KEY = 'bankConn';
+
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGetConn(){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSetConn(record){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(record, IDB_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbClearConn(){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(IDB_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function hasPermission(handle, mode){
+    return (await handle.queryPermission({ mode })) === 'granted';
+  }
+  async function requestPermission(handle, mode){
+    return (await handle.requestPermission({ mode })) === 'granted';
+  }
+  async function isSameFileHandle(a, b){
+    if (!a || !b) return false;
+    try { return await a.isSameEntry(b); } catch(e) { return false; }
+  }
+  async function readFileHandle(handle){
+    const file = await handle.getFile();
+    const text = await file.text();
+    if (!text.trim()) return null;
+    return JSON.parse(text);
+  }
+  // ---------- schema do banco de horas ----------
+  const SCHEMA_VERSION = 1;
+  const APP_ID = 'workaholic-tracker';
+  let bankMeta = { schemaVersion: SCHEMA_VERSION, app: APP_ID, createdAt: null, updatedAt: null, revision: 0 };
+  function resetBankMeta(){
+    const now = new Date().toISOString();
+    bankMeta = { schemaVersion: SCHEMA_VERSION, app: APP_ID, createdAt: now, updatedAt: now, revision: 0 };
+  }
+  function buildBankPayload(){
+    return {
+      schemaVersion: bankMeta.schemaVersion,
+      app: bankMeta.app,
+      createdAt: bankMeta.createdAt,
+      updatedAt: bankMeta.updatedAt,
+      revision: bankMeta.revision,
+      projects: state.projects,
+      entries: state.entries,
+      activeTimer
+    };
+  }
+  async function writeFileHandle(handle){
+    bankMeta.updatedAt = new Date().toISOString();
+    bankMeta.revision = (bankMeta.revision || 0) + 1;
+    const writable = await handle.createWritable();
+    await writable.write(JSON.stringify(buildBankPayload(), null, 2));
+    await writable.close();
+  }
+  // espelha o estado atual (trava + cópia de segurança, estilo ~$arquivo.docx do Word) no IndexedDB —
+  // não é um arquivo visível na pasta, mas cumpre a mesma função sem precisar de permissão de pasta inteira.
+  async function writeShadowCopy(){
+    if (!fileHandle) return;
+    try {
+      await idbSetConn({
+        fileHandle,
+        lock: { app: APP_ID, lockedAt: new Date().toISOString() },
+        snapshot: buildBankPayload()
+      });
+    } catch(e) { console.error('erro ao atualizar cópia oculta local', e); }
+  }
+  function loadIntoState(existing){
+    if (!existing) { resetBankMeta(); return false; }
+    state = { projects: existing.projects || [], entries: existing.entries || [] };
+    activeTimer = existing.activeTimer || null;
+    const now = new Date().toISOString();
+    bankMeta = {
+      schemaVersion: existing.schemaVersion || SCHEMA_VERSION,
+      app: existing.app || APP_ID,
+      createdAt: existing.createdAt || now,
+      updatedAt: existing.updatedAt || now,
+      revision: typeof existing.revision === 'number' ? existing.revision : 0
+    };
+    return true;
+  }
+  function flashSaved(){
+    const el = document.getElementById('save-indicator');
+    if (!el) return;
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }
+  function updateBankIndicator(){
+    const btn = document.getElementById('btn-bank-open');
+    const newBtn = document.getElementById('btn-bank-new');
+    if (fileHandle) {
+      btn.textContent = `📁 ${fileHandle.name}`;
+      btn.title = 'banco conectado — clique para fechar';
+      newBtn.style.display = 'none';
+    } else if (pendingHandle) {
+      btn.textContent = `🔌 reconectar ${pendingHandle.name}`;
+      btn.title = 'a permissão expirou nesta sessão do navegador — clique pra renovar (os dados continuam salvos no arquivo)';
+      newBtn.style.display = '';
+    } else {
+      btn.textContent = 'carregar banco de horas';
+      btn.title = 'abrir um banco de horas (.json) já existente';
+      newBtn.style.display = '';
+    }
+  }
+  function applyLockState(){
+    const locked = !fileHandle;
+    document.getElementById('locked-panel').classList.toggle('hidden', !locked);
+    document.getElementById('workspace').classList.toggle('hidden', locked);
+    document.getElementById('btn-projects').disabled = locked;
+  }
+  function finishBankConnect(){
+    updateBankIndicator();
+    applyLockState();
+    renderAll();
+    if (activeTimer) startTicking();
+  }
+  // conecta a um FileSystemFileHandle já obtido (via open/save picker ou reconexão).
+  // nunca escreve no arquivo principal a não ser que ele esteja mesmo vazio/novo.
+  async function connectToBank(handle){
+    const prevConn = await idbGetConn();
+    const sameFile = await isSameFileHandle(prevConn && prevConn.fileHandle, handle);
+
+    if (sameFile && prevConn.lock) {
+      const when = new Date(prevConn.lock.lockedAt).toLocaleString('pt-BR');
+      if (!confirm(`Este banco pode já estar aberto em outra aba/janela deste navegador, ou não foi fechado corretamente da última vez (marca de trava de ${when}). Deseja continuar mesmo assim?`)) return false;
+    }
+
+    const hadData = loadIntoState(await readFileHandle(handle));
+
+    // recuperação: se a cópia oculta local tiver uma revisão mais nova que o arquivo, a última
+    // gravação no arquivo pode ter falhado — oferece recuperar os dados a partir da cópia local.
+    if (sameFile && prevConn.snapshot && typeof prevConn.snapshot.revision === 'number') {
+      const fileRevision = hadData ? bankMeta.revision : -1;
+      if (prevConn.snapshot.revision > fileRevision) {
+        if (confirm(`Encontramos uma cópia local mais recente (revisão ${prevConn.snapshot.revision}) do que o arquivo (revisão ${fileRevision}) — pode ter acontecido de a última gravação no arquivo ter falhado. Deseja recuperar os dados da cópia local?`)) {
+          loadIntoState(prevConn.snapshot);
+        }
+      }
+    }
+
+    fileHandle = handle;
+    pendingHandle = null;
+    if (!hadData) {
+      state = { projects: [], entries: [] };
+      activeTimer = null;
+      await writeFileHandle(fileHandle);
+    }
+    await writeShadowCopy();
+    finishBankConnect();
+    return true;
+  }
+  // abre um banco de horas .json JÁ EXISTENTE e carrega os dados dele (nunca cria/sobrescreve)
+  async function openBank(){
+    if (!FS_SUPPORTED) { alert('Seu navegador não suporta abrir arquivos locais (use Chrome, Edge ou Opera).'); return; }
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'Banco de horas (JSON)', accept: { 'application/json': ['.json'] } }],
+        excludeAcceptAllOption: false,
+        multiple: false
+      });
+      if (!(await requestPermission(handle, 'readwrite'))) return;
+      await connectToBank(handle);
+    } catch(e) { if (e.name !== 'AbortError') console.error('erro ao abrir banco de horas', e); }
+  }
+  // cria um banco de horas .json NOVO (só grava vazio se o arquivo escolhido estiver mesmo vazio)
+  async function newBank(){
+    if (!FS_SUPPORTED) { alert('Seu navegador não suporta criar arquivos locais (use Chrome, Edge ou Opera).'); return; }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'banco-de-horas.json',
+        types: [{ description: 'Banco de horas (JSON)', accept: { 'application/json': ['.json'] } }]
+      });
+      if (!(await requestPermission(handle, 'readwrite'))) return;
+      await connectToBank(handle);
+    } catch(e) { if (e.name !== 'AbortError') console.error('erro ao criar banco de horas', e); }
+  }
+  async function reconnectPendingBank(){
+    if (!pendingHandle) return;
+    try {
+      if (!(await requestPermission(pendingHandle, 'readwrite'))) return;
+      await connectToBank(pendingHandle);
+    } catch(e) { console.error('erro ao reconectar banco de horas', e); }
+  }
+  async function closeBank(){
+    if (!confirm(`Fechar o banco "${fileHandle.name}"? Os dados salvos nesse arquivo continuam lá — você pode carregá-lo de novo depois.`)) return;
+    fileHandle = null;
+    await idbClearConn();
+    state = { projects: [], entries: [] };
+    activeTimer = null;
+    resetBankMeta();
+    editingProjectId = null;
+    editingProjectName = null;
+    editingProjectColor = null;
+    clearInterval(tickInterval);
+    updateBankIndicator();
+    applyLockState();
+    renderAll();
+  }
+  async function tryRestoreBankHandle(){
+    if (!FS_SUPPORTED) return false;
+    try {
+      const conn = await idbGetConn();
+      if (!conn || !conn.fileHandle) return false;
+      if (!(await hasPermission(conn.fileHandle, 'readwrite'))) {
+        pendingHandle = conn.fileHandle;
+        return false;
+      }
+      loadIntoState(await readFileHandle(conn.fileHandle));
+      fileHandle = conn.fileHandle;
+      await writeShadowCopy();
+      return true;
+    } catch(e) { return false; }
+  }
+  async function saveBank(){
+    if (!fileHandle) return;
+    try {
+      await writeFileHandle(fileHandle);
+      await writeShadowCopy();
+      flashSaved();
+    } catch(e) { console.error('erro ao salvar banco de horas', e); }
+  }
+
+  // ---------- data queries ----------
+  function minutesByDate(filterProjectId){
+    const map = {};
+    for (const e of state.entries) {
+      if (filterProjectId !== 'all' && e.projectId !== filterProjectId) continue;
+      map[e.date] = (map[e.date]||0) + e.durationMinutes;
+    }
+    return map;
+  }
+  function breakdownForDate(dateStr){
+    const map = {};
+    for (const e of state.entries) {
+      if (e.date !== dateStr) continue;
+      if (heatmapFilter !== 'all' && e.projectId !== heatmapFilter) continue;
+      map[e.projectId] = (map[e.projectId]||0) + e.durationMinutes;
+    }
+    return map;
+  }
+  function levelFor(mins){
+    if (!mins) return 0;
+    if (mins < 60) return 1;
+    if (mins < 180) return 2;
+    if (mins < 360) return 3;
+    return 4;
+  }
+  function computeStats(){
+    const totalMinutes = state.entries
+      .filter(e => heatmapFilter==='all' || e.projectId===heatmapFilter)
+      .reduce((s,e)=>s+e.durationMinutes,0);
+    const minMap = minutesByDate(heatmapFilter);
+    let streak = 0;
+    let d = new Date(); d.setHours(0,0,0,0);
+    if (!minMap[fmtDate(d)]) d.setDate(d.getDate()-1);
+    while (minMap[fmtDate(d)]) { streak++; d.setDate(d.getDate()-1); }
+    const now = new Date();
+    const monday = getWeekStart(now);
+    let weekMinutes = 0;
+    for (const [dateStr, mins] of Object.entries(minMap)) {
+      const dt = new Date(dateStr+'T00:00:00');
+      if (dt >= monday) weekMinutes += mins;
+    }
+    return { totalMinutes, streak, weekMinutes };
+  }
+  function buildHeatmapDays(rangeDays){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const start = new Date(today); start.setDate(start.getDate()-(rangeDays-1));
+    start.setDate(start.getDate() - start.getDay());
+    const days = [];
+    let d = new Date(start);
+    while (d <= today) { days.push(new Date(d)); d.setDate(d.getDate()+1); }
+    return days;
+  }
+
+  // ---------- rendering: shared ----------
+  function renderProjectSelects(){
+    const options = state.projects.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    const timerSel = document.getElementById('timer-project-select');
+    const manualSel = document.getElementById('m-project');
+    const filterSel = document.getElementById('heatmap-filter');
+    const prevTimer = timerSel.value, prevManual = manualSel.value;
+    timerSel.innerHTML = options || `<option value="">crie um projeto primeiro</option>`;
+    manualSel.innerHTML = options || `<option value="">crie um projeto primeiro</option>`;
+    filterSel.innerHTML = `<option value="all">todos os projetos</option>` + options;
+    if (state.projects.some(p=>p.id===prevTimer)) timerSel.value = prevTimer;
+    if (state.projects.some(p=>p.id===prevManual)) manualSel.value = prevManual;
+    filterSel.value = (heatmapFilter==='all' || state.projects.some(p=>p.id===heatmapFilter)) ? heatmapFilter : 'all';
+  }
+
+  function renderTimerPanel(){
+    const btn = document.getElementById('timer-toggle');
+    const sel = document.getElementById('timer-project-select');
+    const noProjects = state.projects.length===0;
+    sel.disabled = noProjects || !!activeTimer;
+    btn.disabled = noProjects;
+    if (activeTimer) {
+      sel.value = activeTimer.projectId;
+      btn.textContent = '■ parar';
+      btn.classList.add('running');
+      updateTimerDisplay();
+    } else {
+      btn.textContent = '► iniciar';
+      btn.classList.remove('running');
+      document.getElementById('timer-display').textContent = '00:00:00';
+    }
+  }
+  function updateTimerDisplay(){
+    if (!activeTimer) return;
+    const elapsed = Math.max(0, Date.now()-activeTimer.startedAt);
+    const totalSec = Math.floor(elapsed/1000);
+    const h = String(Math.floor(totalSec/3600)).padStart(2,'0');
+    const m = String(Math.floor((totalSec%3600)/60)).padStart(2,'0');
+    const s = String(totalSec%60).padStart(2,'0');
+    document.getElementById('timer-display').textContent = `${h}:${m}:${s}`;
+  }
+  function startTicking(){
+    clearInterval(tickInterval);
+    updateTimerDisplay();
+    tickInterval = setInterval(updateTimerDisplay, 1000);
+  }
+  function renderRegisterVisibility(){
+    document.querySelectorAll('#register-switch button').forEach(b=>b.classList.toggle('active', b.dataset.mode===registerMode));
+    document.getElementById('mode-timer').classList.toggle('hidden', registerMode!=='timer');
+    document.getElementById('mode-manual').classList.toggle('hidden', registerMode!=='manual');
+    document.getElementById('timer-live-dot').style.display = activeTimer ? 'inline-block' : 'none';
+  }
+
+  // ---------- rendering: day / week / heatmap views ----------
+  function renderDayView(){
+    const dateStr = fmtDate(dayCursor);
+    const dayEntries = state.entries.filter(e=>e.date===dateStr);
+    const byProject = {};
+    for (const e of dayEntries) byProject[e.projectId] = (byProject[e.projectId]||0)+e.durationMinutes;
+    const total = Object.values(byProject).reduce((a,b)=>a+b,0);
+    const container = document.getElementById('view-day');
+    if (Object.keys(byProject).length===0) {
+      container.innerHTML = `<p class="empty">nenhum registro neste dia.</p>`;
+      return;
+    }
+    const rows = Object.entries(byProject).sort((a,b)=>b[1]-a[1]).map(([pid,mins])=>{
+      const proj = state.projects.find(p=>p.id===pid);
+      const pct = total>0 ? Math.max(4, Math.round(mins/total*100)) : 0;
+      return `<div class="day-row">
+        <span class="day-row-label"><span class="entry-dot" style="background:${proj?proj.color:'#666'}"></span>${proj?escapeHtml(proj.name):'projeto removido'}</span>
+        <div class="day-row-bar-track"><div class="day-row-bar" style="width:${pct}%;background:${proj?proj.color:'#666'}"></div></div>
+        <span class="day-row-value mono">${formatDuration(mins)}</span>
+      </div>`;
+    }).join('');
+    container.innerHTML = `<div class="day-view">${rows}
+      <div class="day-total"><span>total do dia</span><strong class="mono">${formatDuration(total)}</strong></div>
+    </div>`;
+  }
+
+  function renderWeekView(){
+    const monday = getWeekStart(weekCursor);
+    const days = [];
+    for (let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); days.push(d); }
+    const dayData = days.map(d=>{
+      const key = fmtDate(d);
+      const dayEntries = state.entries.filter(e=>e.date===key && (heatmapFilter==='all'||e.projectId===heatmapFilter));
+      const byProject = {};
+      for (const e of dayEntries) byProject[e.projectId]=(byProject[e.projectId]||0)+e.durationMinutes;
+      const total = Object.values(byProject).reduce((a,b)=>a+b,0);
+      return { key, byProject, total };
+    });
+    const maxTotal = Math.max(60, ...dayData.map(x=>x.total));
+    const todayStr = fmtDate(new Date());
+    const barsHtml = dayData.map((x,i)=>{
+      const segs = Object.entries(x.byProject).sort((a,b)=>a[0].localeCompare(b[0])).map(([pid,mins])=>{
+        const proj = state.projects.find(p=>p.id===pid);
+        const h = Math.max(2, Math.round(mins/maxTotal*130));
+        return `<div class="week-seg" style="height:${h}px;background:${proj?proj.color:'#666'}" title="${proj?escapeHtml(proj.name):''}: ${formatDuration(mins)}"></div>`;
+      }).join('');
+      const isToday = x.key===todayStr;
+      return `<div class="week-col">
+        <span class="week-total mono">${x.total>0?formatDuration(x.total):''}</span>
+        <div class="week-bar-track">${segs}</div>
+        <span class="week-day-label ${isToday?'today':''}">${WEEKDAYS_PT[i]}<br>${formatDatePt(x.key)}</span>
+      </div>`;
+    }).join('');
+    const usedProjectIds = [...new Set(dayData.flatMap(x=>Object.keys(x.byProject)))];
+    const legend = usedProjectIds.map(pid=>{
+      const proj = state.projects.find(p=>p.id===pid);
+      return `<span><span class="dot" style="background:${proj?proj.color:'#666'}"></span>${proj?escapeHtml(proj.name):'—'}</span>`;
+    }).join('');
+    const weekTotal = dayData.reduce((s,x)=>s+x.total,0);
+    document.getElementById('view-week').innerHTML = `
+      <div class="week-chart">${barsHtml}</div>
+      ${legend ? `<div class="week-legend">${legend}</div>` : ''}
+      <div class="day-total"><span>total da semana</span><strong class="mono">${formatDuration(weekTotal)}</strong></div>
+    `;
+  }
+
+  function renderMonthView(){
+    const monthStart = getMonthStart(monthCursor);
+    const monthEnd = getMonthEnd(monthCursor);
+    const gridStart = getWeekStart(monthStart);
+    const gridEnd = new Date(getWeekStart(monthEnd)); gridEnd.setDate(gridEnd.getDate()+6);
+    const minMap = minutesByDate(heatmapFilter);
+    const todayStr = fmtDate(new Date());
+    let cellsHtml = '';
+    let monthTotal = 0;
+    let d = new Date(gridStart);
+    while (d <= gridEnd) {
+      const key = fmtDate(d);
+      const inMonth = d.getMonth() === monthStart.getMonth();
+      const mins = minMap[key] || 0;
+      if (inMonth) monthTotal += mins;
+      const lvl = levelFor(mins);
+      const classes = ['month-cal-cell', `lvl${lvl}`];
+      if (!inMonth) classes.push('out-of-month');
+      if (key === todayStr) classes.push('today');
+      cellsHtml += `<div class="${classes.join(' ')}" data-date="${key}"><span class="month-cal-daynum">${d.getDate()}</span></div>`;
+      d.setDate(d.getDate()+1);
+    }
+    document.getElementById('month-cal-grid').innerHTML = cellsHtml;
+    document.getElementById('month-cal-total').textContent = formatDuration(monthTotal);
+  }
+
+  function renderHeatmap(rangeDays){
+    const days = buildHeatmapDays(rangeDays);
+    const weeks = [];
+    for (let i=0;i<days.length;i+=7) weeks.push(days.slice(i,i+7));
+    const minMap = minutesByDate(heatmapFilter);
+
+    let lastMonth = -1;
+    let monthHtml = '';
+    weeks.forEach((week, wi) => {
+      const m = week[0].getMonth();
+      if (m !== lastMonth) {
+        monthHtml += `<span style="grid-column:${wi+1}">${MONTHS_PT[m]}</span>`;
+        lastMonth = m;
+      }
+    });
+
+    let gridHtml = '';
+    weeks.forEach((week, wi) => {
+      week.forEach((day, di) => {
+        const key = fmtDate(day);
+        const mins = minMap[key] || 0;
+        const lvl = levelFor(mins);
+        gridHtml += `<div class="cell lvl${lvl}" style="grid-column:${wi+1};grid-row:${di+1}" data-date="${key}"></div>`;
+      });
+    });
+
+    const monthRow = document.getElementById('month-row');
+    const grid = document.getElementById('heatmap-grid');
+    monthRow.style.gridTemplateColumns = `repeat(${weeks.length},12px)`;
+    grid.style.gridTemplateColumns = `repeat(${weeks.length},12px)`;
+    grid.style.gridTemplateRows = `repeat(7,12px)`;
+    monthRow.innerHTML = monthHtml;
+    grid.innerHTML = gridHtml;
+  }
+
+  function renderPanel(){
+    document.querySelectorAll('#view-switch button').forEach(b=>b.classList.toggle('active', b.dataset.view===panelView));
+    document.getElementById('view-day').classList.toggle('hidden', panelView!=='day');
+    document.getElementById('view-week').classList.toggle('hidden', panelView!=='week');
+    document.getElementById('view-month').classList.toggle('hidden', panelView!=='month');
+    document.getElementById('view-heatmap').classList.toggle('hidden', !(panelView==='semester'||panelView==='year'));
+    document.getElementById('heatmap-filter').style.display = panelView==='day' ? 'none' : '';
+
+    const prevBtn = document.getElementById('nav-prev');
+    const nextBtn = document.getElementById('nav-next');
+    const showNav = panelView==='day' || panelView==='week' || panelView==='month';
+    prevBtn.style.display = showNav ? '' : 'none';
+    nextBtn.style.display = showNav ? '' : 'none';
+
+    if (panelView==='day') {
+      const todayStr = fmtDate(new Date());
+      const curStr = fmtDate(dayCursor);
+      document.getElementById('nav-label').textContent = curStr===todayStr ? 'hoje' : formatDatePtFull(curStr);
+      nextBtn.disabled = curStr>=todayStr;
+      renderDayView();
+    } else if (panelView==='week') {
+      const monday = getWeekStart(weekCursor);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+      const curMonday = fmtDate(monday);
+      const thisMonday = fmtDate(getWeekStart(new Date()));
+      document.getElementById('nav-label').textContent = curMonday===thisMonday ? 'esta semana' : `${formatDatePt(fmtDate(monday))} – ${formatDatePt(fmtDate(sunday))}`;
+      nextBtn.disabled = curMonday>=thisMonday;
+      renderWeekView();
+    } else if (panelView==='month') {
+      const ms = getMonthStart(monthCursor);
+      const curKey = `${ms.getFullYear()}-${String(ms.getMonth()+1).padStart(2,'0')}`;
+      const thisMs = getMonthStart(new Date());
+      const thisKey = `${thisMs.getFullYear()}-${String(thisMs.getMonth()+1).padStart(2,'0')}`;
+      document.getElementById('nav-label').textContent = curKey===thisKey ? 'este mês' : `${MONTHS_FULL_PT[ms.getMonth()]} de ${ms.getFullYear()}`;
+      nextBtn.disabled = curKey>=thisKey;
+      renderMonthView();
+    } else {
+      document.getElementById('nav-label').textContent = panelView==='semester' ? 'últimos 6 meses' : 'últimos 12 meses';
+      renderHeatmap(panelView==='semester' ? 182 : 371);
+    }
+    renderStats();
+  }
+
+  function renderStats(){
+    const { totalMinutes, streak, weekMinutes } = computeStats();
+    document.getElementById('stats-strip').innerHTML = `
+      <div class="stat"><span class="stat-value mono">${formatDuration(totalMinutes)}</span><span class="stat-label">total registrado</span></div>
+      <div class="stat"><span class="stat-value mono">${streak}</span><span class="stat-label">dias seguidos</span></div>
+      <div class="stat"><span class="stat-value mono">${formatDuration(weekMinutes)}</span><span class="stat-label">esta semana</span></div>
+    `;
+  }
+
+  function csvEscape(val){
+    const str = String(val);
+    if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g,'""') + '"';
+    }
+    return str;
+  }
+  function exportCsv(){
+    const rows = [...state.entries].sort((a,b)=> a.date.localeCompare(b.date));
+    const header = ['Data','Projeto','Duracao (min)','Duracao (h)','Nota','Origem'];
+    const lines = [header.join(';')];
+    for (const e of rows) {
+      const proj = state.projects.find(p=>p.id===e.projectId);
+      const hoursDecimal = (e.durationMinutes/60).toFixed(2).replace('.', ',');
+      const fields = [
+        formatDatePtFull(e.date),
+        proj ? proj.name : 'projeto removido',
+        e.durationMinutes,
+        hoursDecimal,
+        e.note || '',
+        e.source==='timer' ? 'timer' : 'manual'
+      ];
+      lines.push(fields.map(csvEscape).join(';'));
+    }
+    const csvContent = '﻿' + lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `caderno-de-horas_${fmtDate(new Date())}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- importação de CSV (reverso de exportCsv) ----------
+  function parseCsvLine(line){
+    const fields = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (line[i+1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += c;
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === ';') { fields.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    fields.push(cur);
+    return fields;
+  }
+  function parseDatePtFullToIso(str){
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((str||'').trim());
+    if (!m) return null;
+    const [, dd, mm, yyyy] = m;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function parseCsvForImport(text){
+    const clean = text.replace(/^﻿/, '');
+    const lines = clean.split(/\r\n|\n/).filter(l => l.trim() !== '');
+    const dataLines = lines.slice(1); // ignora a linha de cabeçalho
+    const pendingEntries = [];
+    const pendingNewProjects = [];
+    const existingNames = new Map(state.projects.map(p => [p.name, p.id]));
+    const newNames = new Map();
+    let skipped = 0;
+
+    for (const line of dataLines) {
+      const cols = parseCsvLine(line);
+      if (cols.length < 6) { skipped++; continue; }
+      const [dataStr, projetoStr, minStr, horaStr, notaStr, origemStr] = cols;
+
+      const isoDate = parseDatePtFullToIso(dataStr);
+      if (!isoDate) { skipped++; continue; }
+
+      let durationMinutes = parseInt(minStr, 10);
+      if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        const hoursNum = parseFloat((horaStr||'').replace(',', '.'));
+        durationMinutes = Number.isFinite(hoursNum) ? Math.round(hoursNum * 60) : 0;
+      }
+      if (durationMinutes <= 0) { skipped++; continue; }
+
+      const projetoName = (projetoStr||'').trim();
+      if (!projetoName || projetoName === 'projeto removido') { skipped++; continue; }
+
+      let projectId = existingNames.get(projetoName) || newNames.get(projetoName);
+      if (!projectId) {
+        projectId = genId();
+        newNames.set(projetoName, projectId);
+        const color = PALETTE[(state.projects.length + pendingNewProjects.length) % PALETTE.length];
+        pendingNewProjects.push({ id: projectId, name: projetoName, color });
+      }
+
+      pendingEntries.push({
+        id: genId(),
+        projectId,
+        date: isoDate,
+        durationMinutes,
+        note: notaStr || '',
+        source: (origemStr||'').trim().toLowerCase() === 'timer' ? 'timer' : 'manual'
+      });
+    }
+    return { pendingEntries, pendingNewProjects, skipped };
+  }
+  async function importCsvFile(file){
+    const text = await file.text();
+    const { pendingEntries, pendingNewProjects, skipped } = parseCsvForImport(text);
+    if (pendingEntries.length === 0) {
+      alert(skipped > 0 ? `nenhum registro válido encontrado no CSV (${skipped} linha(s) ignorada(s)).` : 'nenhum registro encontrado no CSV.');
+      return;
+    }
+    let msg = `importar ${pendingEntries.length} registro(s)`;
+    if (pendingNewProjects.length > 0) msg += ` e criar ${pendingNewProjects.length} projeto(s) novo(s) (${pendingNewProjects.map(p=>p.name).join(', ')})`;
+    msg += skipped > 0 ? `? ${skipped} linha(s) serão ignoradas.` : '?';
+    if (!confirm(msg)) return;
+    state.projects.push(...pendingNewProjects);
+    state.entries.push(...pendingEntries);
+    await saveBank();
+    renderAll();
+    alert(`importação concluída: ${pendingEntries.length} registro(s) adicionados.`);
+  }
+
+  function renderEntriesList(){
+    document.getElementById('btn-export-csv').disabled = state.entries.length===0;
+    const sorted = [...state.entries].sort((a,b)=> (b.date+b.id).localeCompare(a.date+a.id));
+    const list = sorted.slice(0, 40);
+    const container = document.getElementById('entries-list');
+    if (list.length===0) {
+      container.innerHTML = `<p class="empty">nenhum registro ainda. inicie o timer ou registre manualmente acima.</p>`;
+      return;
+    }
+    container.innerHTML = list.map(e => {
+      const proj = state.projects.find(p=>p.id===e.projectId);
+      return `<div class="entry-row" data-id="${e.id}">
+        <span class="entry-dot" style="background:${proj?proj.color:'#666'}"></span>
+        <span class="entry-date mono">${formatDatePt(e.date)}</span>
+        <span class="entry-project">${proj?escapeHtml(proj.name):'projeto removido'}</span>
+        <span class="entry-duration mono">${formatDuration(e.durationMinutes)}</span>
+        <span class="entry-note">${escapeHtml(e.note||'')}</span>
+        <span class="entry-source" title="${e.source==='timer'?'via timer':'manual'}">${e.source==='timer'?'⏱':'✎'}</span>
+        <button class="entry-edit" data-id="${e.id}" type="button">editar</button>
+        <button class="entry-del" data-id="${e.id}" type="button">excluir</button>
+      </div>`;
+    }).join('');
+  }
+
+  function renderProjectsList(){
+    const container = document.getElementById('projects-list');
+    if (state.projects.length===0) {
+      container.innerHTML = `<p class="projects-empty">nenhum projeto ainda.</p>`;
+      return;
+    }
+    container.innerHTML = state.projects.map(p => {
+      if (p.id === editingProjectId) {
+        const nameVal = editingProjectName ?? p.name;
+        const colorVal = editingProjectColor ?? p.color;
+        const swatches = PALETTE.map(c => `<button type="button" class="color-swatch${c===colorVal?' selected':''}" data-color="${c}" style="background:${c}"></button>`).join('');
+        return `<div class="project-row editing" data-id="${p.id}">
+          <input type="text" class="project-edit-name mono" id="project-edit-name-input" value="${escapeHtml(nameVal)}" maxlength="40">
+          <div class="color-swatches">${swatches}</div>
+          <div class="project-row-actions">
+            <button class="project-save btn-primary" data-id="${p.id}" type="button">salvar</button>
+            <button class="project-cancel btn-ghost" type="button">cancelar</button>
+          </div>
+        </div>`;
+      }
+      return `<div class="project-row" data-id="${p.id}">
+        <span class="entry-dot" style="background:${p.color}"></span>
+        <span class="project-row-name">${escapeHtml(p.name)}</span>
+        <button class="project-edit-btn" data-id="${p.id}" type="button">editar</button>
+        <button class="project-del-btn" data-id="${p.id}" type="button">excluir</button>
+      </div>`;
+    }).join('');
+  }
+
+  function renderAll(){
+    renderProjectSelects();
+    renderProjectsList();
+    renderTimerPanel();
+    renderRegisterVisibility();
+    renderPanel();
+    renderEntriesList();
+  }
+
+  // ---------- event handlers ----------
+  document.getElementById('btn-bank-open').addEventListener('click', () => {
+    if (fileHandle) closeBank();
+    else if (pendingHandle) reconnectPendingBank();
+    else openBank();
+  });
+  document.getElementById('btn-bank-new').addEventListener('click', () => newBank());
+  document.getElementById('btn-bank-open-main').addEventListener('click', () => {
+    if (pendingHandle) reconnectPendingBank();
+    else openBank();
+  });
+  document.getElementById('btn-bank-new-main').addEventListener('click', () => newBank());
+
+  document.getElementById('btn-projects').addEventListener('click', () => {
+    document.getElementById('projects-popover').classList.toggle('open');
+    document.getElementById('np-name').focus();
+  });
+  document.getElementById('np-cancel').addEventListener('click', () => {
+    document.getElementById('projects-popover').classList.remove('open');
+    document.getElementById('np-name').value = '';
+    editingProjectId = null;
+    editingProjectName = null;
+    editingProjectColor = null;
+    renderProjectsList();
+  });
+  document.getElementById('np-save').addEventListener('click', async () => {
+    const name = document.getElementById('np-name').value.trim();
+    if (!name) return;
+    const color = PALETTE[state.projects.length % PALETTE.length];
+    state.projects.push({ id: genId(), name, color });
+    await saveBank();
+    document.getElementById('np-name').value = '';
+    renderAll();
+  });
+  document.addEventListener('click', (ev) => {
+    const pop = document.getElementById('projects-popover');
+    if (!pop.classList.contains('open')) return;
+    if (!pop.contains(ev.target) && ev.target.id !== 'btn-projects') {
+      pop.classList.remove('open');
+      editingProjectId = null;
+      editingProjectName = null;
+      editingProjectColor = null;
+      renderProjectsList();
+    }
+  });
+
+  document.getElementById('projects-list').addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    const editBtn = ev.target.closest('.project-edit-btn');
+    const delBtn = ev.target.closest('.project-del-btn');
+    const saveBtn = ev.target.closest('.project-save');
+    const cancelBtn = ev.target.closest('.project-cancel');
+    const swatch = ev.target.closest('.color-swatch');
+    if (editBtn) {
+      const proj = state.projects.find(p=>p.id===editBtn.dataset.id);
+      if (!proj) return;
+      editingProjectId = proj.id;
+      editingProjectName = proj.name;
+      editingProjectColor = proj.color;
+      renderProjectsList();
+      return;
+    }
+    if (delBtn) {
+      const proj = state.projects.find(p=>p.id===delBtn.dataset.id);
+      if (!proj) return;
+      if (activeTimer && activeTimer.projectId === proj.id) {
+        alert('não é possível excluir um projeto com o timer rodando nele. pare o timer primeiro.');
+        return;
+      }
+      const count = state.entries.filter(e=>e.projectId===proj.id).length;
+      const msg = count > 0
+        ? `excluir "${proj.name}"? ${count} registro(s) já feito(s) com este projeto serão mantidos, mas passarão a aparecer como "projeto removido". essa ação não pode ser desfeita.`
+        : `excluir "${proj.name}"? essa ação não pode ser desfeita.`;
+      if (!confirm(msg)) return;
+      state.projects = state.projects.filter(p=>p.id!==proj.id);
+      if (editingProjectId === proj.id) { editingProjectId = null; editingProjectName = null; editingProjectColor = null; }
+      await saveBank();
+      renderAll();
+      return;
+    }
+    if (swatch) {
+      const input = document.getElementById('project-edit-name-input');
+      if (input) editingProjectName = input.value;
+      editingProjectColor = swatch.dataset.color;
+      renderProjectsList();
+      return;
+    }
+    if (cancelBtn) {
+      editingProjectId = null;
+      editingProjectName = null;
+      editingProjectColor = null;
+      renderProjectsList();
+      return;
+    }
+    if (saveBtn) {
+      const proj = state.projects.find(p=>p.id===saveBtn.dataset.id);
+      if (!proj) return;
+      const input = document.getElementById('project-edit-name-input');
+      const name = input ? input.value.trim() : proj.name;
+      if (!name) { alert('o nome do projeto não pode ficar vazio'); return; }
+      proj.name = name;
+      proj.color = editingProjectColor || proj.color;
+      editingProjectId = null;
+      editingProjectName = null;
+      editingProjectColor = null;
+      await saveBank();
+      renderAll();
+    }
+  });
+
+  document.getElementById('timer-toggle').addEventListener('click', async () => {
+    if (activeTimer) {
+      const durationMinutes = Math.max(1, Math.round((Date.now()-activeTimer.startedAt)/60000));
+      state.entries.push({
+        id: genId(), projectId: activeTimer.projectId,
+        date: fmtDate(new Date(activeTimer.startedAt)),
+        durationMinutes, note: '', source: 'timer'
+      });
+      activeTimer = null;
+      clearInterval(tickInterval);
+      await saveBank();
+      renderAll();
+    } else {
+      const projId = document.getElementById('timer-project-select').value;
+      if (!projId) { alert('crie ou selecione um projeto primeiro'); return; }
+      activeTimer = { projectId: projId, startedAt: Date.now() };
+      await saveBank();
+      startTicking();
+      renderAll();
+    }
+  });
+
+  document.getElementById('manual-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const date = document.getElementById('m-date').value;
+    const projectId = document.getElementById('m-project').value;
+    const hours = parseInt(document.getElementById('m-hours').value || '0', 10);
+    const minutes = parseInt(document.getElementById('m-minutes').value || '0', 10);
+    const note = document.getElementById('m-note').value.trim();
+    if (!projectId) { alert('crie um projeto primeiro'); return; }
+    const durationMinutes = hours*60 + minutes;
+    if (durationMinutes <= 0) { alert('informe uma duração maior que zero'); return; }
+    if (editingEntryId) {
+      const entry = state.entries.find(e=>e.id===editingEntryId);
+      if (entry) Object.assign(entry, { date, projectId, durationMinutes, note });
+      editingEntryId = null;
+      document.getElementById('manual-submit-btn').textContent = 'salvar';
+    } else {
+      state.entries.push({ id: genId(), date, projectId, durationMinutes, note, source: 'manual' });
+    }
+    await saveBank();
+    document.getElementById('manual-form').reset();
+    document.getElementById('m-date').value = fmtDate(new Date());
+    renderAll();
+  });
+
+  document.getElementById('entries-list').addEventListener('click', async (ev) => {
+    const editBtn = ev.target.closest('.entry-edit');
+    const delBtn = ev.target.closest('.entry-del');
+    if (editBtn) {
+      const entry = state.entries.find(e=>e.id===editBtn.dataset.id);
+      if (!entry) return;
+      document.getElementById('m-date').value = entry.date;
+      document.getElementById('m-project').value = entry.projectId;
+      document.getElementById('m-hours').value = Math.floor(entry.durationMinutes/60);
+      document.getElementById('m-minutes').value = entry.durationMinutes % 60;
+      document.getElementById('m-note').value = entry.note || '';
+      editingEntryId = entry.id;
+      document.getElementById('manual-submit-btn').textContent = 'salvar edição';
+      document.getElementById('manual-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (delBtn) {
+      if (confirm('excluir este registro?')) {
+        state.entries = state.entries.filter(e=>e.id!==delBtn.dataset.id);
+        await saveBank();
+        renderAll();
+      }
+    }
+  });
+
+  document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
+  document.getElementById('btn-import-csv').addEventListener('click', () => {
+    document.getElementById('csv-import-input').click();
+  });
+  document.getElementById('csv-import-input').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    await importCsvFile(file);
+  });
+
+  document.getElementById('register-switch').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-mode]');
+    if (!btn) return;
+    registerMode = btn.dataset.mode;
+    renderRegisterVisibility();
+  });
+
+  document.getElementById('view-switch').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-view]');
+    if (!btn) return;
+    panelView = btn.dataset.view;
+    renderPanel();
+  });
+
+  document.getElementById('nav-prev').addEventListener('click', () => {
+    if (panelView==='day') dayCursor.setDate(dayCursor.getDate()-1);
+    else if (panelView==='week') weekCursor.setDate(weekCursor.getDate()-7);
+    else if (panelView==='month') monthCursor.setMonth(monthCursor.getMonth()-1);
+    renderPanel();
+  });
+  document.getElementById('nav-next').addEventListener('click', () => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (panelView==='day') {
+      const next = new Date(dayCursor); next.setDate(next.getDate()+1);
+      if (next<=today) dayCursor = next;
+    } else if (panelView==='week') {
+      const next = new Date(weekCursor); next.setDate(next.getDate()+7);
+      if (getWeekStart(next) <= getWeekStart(today)) weekCursor = next;
+    } else if (panelView==='month') {
+      const next = new Date(monthCursor); next.setMonth(next.getMonth()+1);
+      if (getMonthStart(next) <= getMonthStart(today)) monthCursor = next;
+    }
+    renderPanel();
+  });
+
+  document.getElementById('heatmap-filter').addEventListener('change', (ev) => {
+    heatmapFilter = ev.target.value;
+    renderPanel();
+  });
+
+  const tooltip = document.getElementById('tooltip');
+  function attachDayTooltip(gridEl, selector){
+    gridEl.addEventListener('mousemove', (ev) => {
+      const cell = ev.target.closest(selector);
+      if (!cell) { tooltip.classList.add('hidden'); return; }
+      const dateStr = cell.dataset.date;
+      const breakdown = breakdownForDate(dateStr);
+      const entries = Object.entries(breakdown);
+      let html = `<strong>${formatDatePtFull(dateStr)}</strong>`;
+      if (entries.length===0) {
+        html += `<br><span style="color:var(--muted)">sem registro</span>`;
+      } else {
+        let total = 0;
+        entries.sort((a,b)=>b[1]-a[1]).forEach(([pid,mins])=>{
+          const proj = state.projects.find(p=>p.id===pid);
+          html += `<br>${proj?escapeHtml(proj.name):'—'}: ${formatDuration(mins)}`;
+          total += mins;
+        });
+        if (entries.length>1) html += `<br><span style="color:var(--brass-bright)">total: ${formatDuration(total)}</span>`;
+      }
+      tooltip.innerHTML = html;
+      tooltip.style.left = (ev.clientX+12)+'px';
+      tooltip.style.top = (ev.clientY+12)+'px';
+      tooltip.classList.remove('hidden');
+    });
+    gridEl.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
+  }
+  attachDayTooltip(document.getElementById('heatmap-grid'), '.cell');
+  attachDayTooltip(document.getElementById('month-cal-grid'), '.month-cal-cell');
+
+  // ---------- init ----------
+  (async function init(){
+    if (!FS_SUPPORTED) {
+      document.getElementById('btn-bank-open').style.display = 'none';
+      document.getElementById('btn-bank-new').style.display = 'none';
+      document.getElementById('btn-bank-open-main').style.display = 'none';
+      document.getElementById('btn-bank-new-main').style.display = 'none';
+      document.querySelector('#locked-panel .empty').textContent = 'seu navegador não suporta salvar arquivos locais diretamente (File System Access API). Use Chrome, Edge ou Opera para usar o Caderno de Horas.';
+    } else {
+      await tryRestoreBankHandle();
+    }
+    updateBankIndicator();
+    applyLockState();
+    document.getElementById('m-date').value = fmtDate(new Date());
+    renderAll();
+    if (activeTimer) startTicking();
+    document.body.classList.add('loaded');
+  })();
+</script>
+</body>
+</html>
