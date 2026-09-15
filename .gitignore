@@ -1,3 +1,7 @@
 # bancos de horas locais (dados pessoais, não fazem parte do app)
 banco-de-horas.json
 *.bank.json
+
+# binário compilado da CLI
+cli/horas
+cli/horas.exe

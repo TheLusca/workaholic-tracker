@@ -11,8 +11,8 @@ Rastreador pessoal de horas trabalhadas por projeto, inspirado nos painéis de c
 ## Status atual / próximos passos
 - Protótipo web (`caderno-de-horas.html`) está funcionalmente completo: registro (timer + manual), painel dia/semana/mês/6 meses/ano, estatísticas, CSV (export + import), gerenciamento de projetos (criar/editar/excluir), banco de horas em arquivo `.json` selecionado diretamente (schema versionado) com trava/backup estilo Office implementada via IndexedDB (ver seção Armazenamento).
 - **Correção de rumo**: a primeira versão da trava/backup pedia acesso à pasta inteira (`showDirectoryPicker`) pra poder criar um arquivo irmão oculto de verdade. Voltamos pra seleção direta do arquivo (sem pedir pasta) e reimplementamos a trava/backup como espelho no IndexedDB — mesma função, permissão bem menor.
-- Testado com estado simulado e um `FileSystemFileHandle` simulado no navegador (bypassando os diálogos nativos, que não são automatizáveis pelas ferramentas usadas até aqui): todas as views do painel, edição/exclusão de projeto, e o ciclo completo de conectar/salvar/fechar/detectar-trava/recuperar-por-revisão do banco funcionam sem erros. **Falta validação manual num Chrome/Edge de verdade** só da interação real com os diálogos nativos de arquivo — a lógica por trás já foi validada.
-- **Próxima implementação: a versão CLI** — já tem conceito desenhado (comandos, linguagem cogitada, referências de UX) na seção "Conceito de versão CLI" logo abaixo. Nada de código ainda, só a especificação.
+- Testado com estado simulado e um `FileSystemFileHandle` simulado no navegador, e **validado manualmente num Chrome de verdade** — existe um `banco-de-horas.json` real gerado pelo uso genuíno do app (projeto "Mapinguari Website", múltiplas revisões), confirmando que o fluxo de criar/carregar/salvar o banco funciona na prática. Nenhuma pendência de validação restante nessa frente.
+- **Versão CLI implementada** (primeira versão, em Go) — todos os comandos do conceito original funcionando, testados manualmente num banco isolado e a interoperabilidade com o arquivo real do app web confirmada. Ver seção "Versão CLI" logo abaixo e [cli/README.md](cli/README.md). Próximo passo natural: decidir se vale empacotar/distribuir o binário (e cogitar `go install` direto do repositório).
 
 ## Decisões de plataforma
 - MVP: web app client-side, sem backend, uso pessoal.
@@ -89,19 +89,27 @@ Como a conexão é por arquivo solto (não pasta), não há como criar um arquiv
 - CLI: SQLite ou JSON em `~/.local/share/horas/`.
 - Se a versão desktop evoluir com Tauri, o arquivo `.json` via navegador deixa de ser necessário — o próprio Tauri dá acesso a filesystem sem as limitações do navegador (Chromium-only, permissão por sessão), inclusive pra criar arquivos de trava reais ao lado do banco se fizer sentido nessa versão.
 
-## Conceito de versão CLI (desenhada, não implementada)
+## Versão CLI
+Implementação inicial em **Go** (binário único, sem runtime) na subpasta [`cli/`](cli/) — ver [cli/README.md](cli/README.md) pra build e uso. Todos os comandos do conceito original foram implementados, mais duas extensões pequenas:
+
 ```
 horas start <projeto>
 horas stop
-horas add <projeto> --hoje 2h --nota "..."
+horas add <projeto> --hoje 2h [--nota "..."]
+horas add <projeto> --data YYYY-MM-DD --duracao 2h [--nota "..."]   ← extensão: registrar dias que não são hoje
 horas hoje
 horas semana
 horas painel --ano
 horas status
+horas --banco <caminho> <comando>                                   ← extensão: apontar pra um arquivo específico
 ```
-- Linguagem cogitada: Go ou Rust (binário único, sem runtime) vs Node/Python (prototipagem mais rápida).
-- Referências de UX citadas: `timewarrior`, WakaTime CLI.
-- Ponto de atenção de design: um comando `status` sempre rápido de consultar, pra não esquecer o timer rodando.
+
+- **Mesmo schema do app web, interoperabilidade testada de verdade**: a CLI lê e grava o schema descrito em "Armazenamento" acima (`schemaVersion`, `app`, `createdAt`, `updatedAt`, `revision`, `projects`, `entries`, `activeTimer`). Testado apontando `--banco` pra uma cópia do `banco-de-horas.json` real (gerado pelo app web, projeto "Mapinguari Website"): a CLI leu os dados corretamente, reconheceu o projeto existente por nome sem duplicar, e ao salvar preservou o `createdAt` original e incrementou `revision` em +1 — dá pra usar o mesmo arquivo pelos dois de verdade.
+- **Projetos são criados automaticamente** pelo nome na primeira vez que aparecem em `start`/`add` (mesma lógica de casamento por nome exato do import de CSV do app web) — não existe comando dedicado de "criar projeto", mantendo a filosofia de ser rápido de usar.
+- **Local do banco por padrão**: `~/.local/share/horas/banco-de-horas.json`, criado automaticamente no primeiro registro (ao contrário do app web, a CLI não exige um passo explícito de "criar banco" — tem acesso direto ao filesystem, sem as restrições de permissão de um navegador).
+- **`horas painel --ano`**: heatmap ASCII (últimos ~12 meses), mesmos 5 níveis de intensidade do heatmap/calendário do app web. Achei e corrigi um bug de alinhamento durante o teste: os blocos de sombreamento Unicode (`·░▒▓█`) têm largura "ambígua" e renderizam em largura dupla em vários terminais, desalinhando com os rótulos de mês (ASCII) — trocado por caracteres ASCII puros (`.:+*#`), alinhamento confirmado caractere a caractere.
+- Testado localmente (Go precisou ser instalado nesta máquina, que não tinha nenhum runtime): `go vet` e `gofmt` limpos, todos os comandos testados manualmente com um banco isolado — start/stop/status, add com `--hoje` e com `--data`/`--duracao`, agregação em `hoje`/`semana`, tratamento de erro (duração inválida, sem projeto, stop sem timer rodando).
+- Referências de UX que motivaram o design original: `timewarrior`, WakaTime CLI. Ponto de atenção: `status` precisa ser sempre rápido de consultar, pra não esquecer o timer rodando — por isso não faz nenhuma agregação extra, só mostra o estado do timer.
 
 ## Arquivo do protótipo
 `caderno-de-horas.html` — HTML/CSS/JS puro, arquivo único, sem dependências externas de build (só carrega fontes do Google Fonts via CDN). Serve de referência funcional de UI/UX e lógica de negócio (cálculo de streak, agregação por dia/semana, heatmap) ao portar para outra stack.
